@@ -10,6 +10,7 @@ if(!$conn) {
 }
 echo "Connected successfully!";
 
+
 function parseDate($datetime) {
   //Get rid of the GMT
   $datetime = chop($datetime,"GMT");
@@ -19,9 +20,11 @@ function parseDate($datetime) {
   return "'" . $datetime['year'] . "-" . $datetime['month'] . "-" . $datetime['day'] . " " . $datetime['hour'] . ":" . $datetime['minute'] . ":00'";
 }
 
+
 function enterResult($conn) {
   //read .csv from file
   $result = file('data.csv');
+  $checksum = "'" . sha1_file('data.csv') . "'";
 
   //Remove unnecessary Newlines
   $result = array_diff($result,["\n"]);
@@ -38,16 +41,17 @@ function enterResult($conn) {
   array_shift($result);
 
   $datetime = parseDate($eventInfo[0]);
-  /*
-  $datetime = chop($eventInfo[0],"GMT");
-  $datetime = date_parse_from_format("Y.m.d h:i a",$datetime);
 
-  $finaldatetime ="'" . $datetime['year'] . "-" . $datetime['month'] . "-" . $datetime['day'] . " " . $datetime['hour'] . ":" . $datetime['minute'] . ":00'";
-  echo $finaldatetime;*/
+  $sql_checkdoubles = "SELECT checksum FROM events";
+  $sql_eventInfo = "INSERT INTO events (checksum, time_and_day, league_id, season_id) VALUES ($checksum, $datetime, " . $leagueInfo[1] . ", " . $leagueInfo[3] . ");";
 
-  $sql_eventInfo = "INSERT INTO events (time_and_day, lone_event, league_id, season_id, teamevent, multiclass) VALUES ($datetime, FALSE, " . $leagueInfo[1] . ", " . $leagueInfo[3] . ", FALSE, FALSE);";
+  $answer = $conn->query($sql_checkdoubles);
+  $answer = $answer->fetch_assoc();
+  $checkcheck = "'" . $answer["checksum"] . "'";
 
-  if($conn->query($sql_eventInfo) === TRUE) {
+  if($checkcheck == $checksum) {
+    echo "<br><b>Entry already exists!</b><br>" . $answer[0] . "<br>";
+  } elseif ($conn->query($sql_eventInfo) === TRUE) {
     $last_id = $conn->insert_id;
     echo "<br>Entry successful! Insert ID is: " . $last_id;
   } else {
@@ -68,8 +72,5 @@ $conn->close();
   <form>
     <button formaction="<?php ?>"
     </form>
-
-
-
   </body>
   </html>
