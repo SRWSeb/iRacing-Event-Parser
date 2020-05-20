@@ -17,14 +17,31 @@ function parseDate($datetime) {
   //Parse Date into usable array
   $datetime = date_parse_from_format("Y.m.d h:i a",$datetime);
   //Build string for MySQL and return it
-  return "'" . $datetime['year'] . "-" . $datetime['month'] . "-" . $datetime['day'] . " " . $datetime['hour'] . ":" . $datetime['minute'] . ":00'";
+  return $datetime['year'] . "-" . $datetime['month'] . "-" . $datetime['day'] . " " . $datetime['hour'] . ":" . $datetime['minute'] . ":00";
 }
 
+function checkDoubles($conn, $checksum) {
+  //Get field checksum from table events if the provided checksum matches
+  $stmt = "SELECT checksum FROM events WHERE checksum=\"$checksum\"";
+  $result = $conn->query($stmt);
+  $result = $result->fetch_assoc();
+  //If we get a result, we obviously have a double and return true.
+  if($result) {
+    return true;
+  }
+  //If otherwise we had no match and no double. So we return false.
+  return false;
+}
 
 function enterResult($conn) {
+  $double = false;
+  $stmt = $conn->prepare("INSERT INTO events (checksum, time_and_day, league_id, season_id) VALUES (?, ?, ?, ?)");
+  $stmt->bind_param("ssii", $checksum, $datetime, $leagueid, $seasonid);
+
   //read .csv from file
   $result = file('data.csv');
   $checksum = "'" . sha1_file('data.csv') . "'";
+  $double = checkDoubles($conn, $checksum);
 
   //Remove unnecessary Newlines
   $result = array_diff($result,["\n"]);
@@ -41,22 +58,19 @@ function enterResult($conn) {
   array_shift($result);
 
   $datetime = parseDate($eventInfo[0]);
+  $leagueid = $leagueInfo[1];
+  $seasonid = $leagueInfo[3];
 
-  $sql_checkdoubles = "SELECT checksum FROM events";
   $sql_eventInfo = "INSERT INTO events (checksum, time_and_day, league_id, season_id) VALUES ($checksum, $datetime, " . $leagueInfo[1] . ", " . $leagueInfo[3] . ");";
 
-  $answer = $conn->query($sql_checkdoubles);
-  $answer = $answer->fetch_assoc();
-  $checkcheck = "'" . $answer["checksum"] . "'";
-
-  if($checkcheck == $checksum) {
-    echo "<br><b>Entry already exists!</b><br>" . $answer[0] . "<br>";
-  } elseif ($conn->query($sql_eventInfo) === TRUE) {
-    $last_id = $conn->insert_id;
-    echo "<br>Entry successful! Insert ID is: " . $last_id;
+  if($double) {
+    echo "<br><b>Entry already exists!</b><br>";
   } else {
-    echo "Error: " . $sql_eventInfo . "<br>" . $conn->error;
+    $stmt->execute();
+    $last_id = $conn->insert_id;
+    echo "<br>Entry successful! Insert ID is: " . $last_id . "<br>";
   }
+  $stmt->close();
 }
 
 enterResult($conn);
