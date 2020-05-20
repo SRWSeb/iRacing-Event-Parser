@@ -10,7 +10,7 @@ if(!$conn) {
 }
 echo "Connected successfully!";
 
-
+//Takes day and time straight out of the results csv and returns it in a MySQL compatible format.
 function parseDate($datetime) {
   //Get rid of the GMT
   $datetime = chop($datetime,"GMT");
@@ -20,6 +20,7 @@ function parseDate($datetime) {
   return $datetime['year'] . "-" . $datetime['month'] . "-" . $datetime['day'] . " " . $datetime['hour'] . ":" . $datetime['minute'] . ":00";
 }
 
+//Checks the results table if the checksum is already in there. Returns true for a double, false for no double.
 function checkDoubles($conn, $checksum) {
   //Get field checksum from table events if the provided checksum matches
   $stmt = "SELECT checksum FROM events WHERE checksum=\"$checksum\"";
@@ -35,8 +36,12 @@ function checkDoubles($conn, $checksum) {
 
 function enterResult($conn) {
   $double = false;
-  $stmt = $conn->prepare("INSERT INTO events (checksum, time_and_day, league_id, season_id) VALUES (?, ?, ?, ?)");
-  $stmt->bind_param("ssii", $checksum, $datetime, $leagueid, $seasonid);
+
+  //Prepare the statements for the SQL inserts and bind the parameters.
+  $stmt_event = $conn->prepare("INSERT INTO events (checksum, time_and_day, league_id, season_id) VALUES (?, ?, ?, ?)");
+  $stmt_event->bind_param("ssii", $checksum, $datetime, $leagueid, $seasonid);
+  $stmt_results = $conn->prepare("INSERT INTO results (event_id, race_pos, race_fastest_lap, race_fastest_lap_num, race_average_lap, race_inc, gap_ahead) VALUES (?, ?, ?, ?, ?, ?, ?)");
+  $stmt_results->bind_param("iiiiiii", $eventid, $racepos, $racefastest, $racefastestnum, $raceaverage, $raceinc, $gapahead);
 
   //read .csv from file
   $result = file('data.csv');
@@ -66,11 +71,11 @@ function enterResult($conn) {
   if($double) {
     echo "<br><b>Entry already exists!</b><br>";
   } else {
-    $stmt->execute();
+    $stmt_event->execute();
     $last_id = $conn->insert_id;
     echo "<br>Entry successful! Insert ID is: " . $last_id . "<br>";
   }
-  $stmt->close();
+  $stmt_event->close();
 }
 
 enterResult($conn);
