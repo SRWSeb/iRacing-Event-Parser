@@ -34,6 +34,28 @@ function checkDoubles($conn, $checksum) {
   return false;
 }
 
+//Checks the drivers table if driver is already in the database
+function checkDriverExists ($conn, $iracingid) {
+  $stmt = "SELECT iracing_name FROM drivers WHERE iracing_id=$iracingid";
+  $result = $conn->query($stmt);
+  $result = $result->fetch_assoc();
+  if($result) {
+    return true;
+  }
+  return false;
+}
+
+//Enters a new driver into the database.
+function newDriver ($conn, $data) {
+  $iracingid = $data[6];
+  $name = $data[7];
+  $stmt = $conn->prepare("INSERT INTO drivers (iracing_id, iracing_name, display_name) VALUES (?, ?, ?)");
+  $stmt->bind_param("iss", $iracingid, $name, $name);
+  $stmt->execute();
+  $stmt->close();
+  echo "<b>Driver " . $name . ", ID " . $iracingid . " saved to Database.</b><br>";
+}
+
 function enterResult($conn) {
   $double = false;
 
@@ -76,6 +98,18 @@ function enterResult($conn) {
     echo "<br>Entry successful! Insert ID is: " . $last_id . "<br>";
   }
   $stmt_event->close();
+
+  foreach ($result as $key => $value) {
+    $standing = str_getcsv($value);
+    echo "Driver: " . $standing[7] . "<br>";
+    if(!checkDriverExists($conn, $standing[6])) {
+      newDriver($conn, $standing);
+    } else {
+      echo "Driver exists in database.<br>";
+    }
+
+
+  }
 }
 
 enterResult($conn);
