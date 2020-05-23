@@ -66,8 +66,8 @@ function enterResult($conn) {
   $stmt_results->bind_param("iiiiiii", $eventid, $racepos, $racefastest, $racefastestnum, $raceaverage, $raceinc, $gapahead);
 
   //read .csv from file
-  $result = file('data.csv');
-  $checksum = "'" . sha1_file('data.csv') . "'";
+  $result = file('data2.csv');
+  $checksum = "'" . sha1_file('data2.csv') . "'";
   $double = checkDoubles($conn, $checksum);
 
   //Remove unnecessary Newlines
@@ -87,8 +87,6 @@ function enterResult($conn) {
   $datetime = parseDate($eventInfo[0]);
   $leagueid = $leagueInfo[1];
   $seasonid = $leagueInfo[3];
-
-  $sql_eventInfo = "INSERT INTO events (checksum, time_and_day, league_id, season_id) VALUES ($checksum, $datetime, " . $leagueInfo[1] . ", " . $leagueInfo[3] . ");";
 
   if($double) {
     echo "<br><b>Entry already exists!</b><br>";
