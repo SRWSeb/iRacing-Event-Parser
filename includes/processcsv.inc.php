@@ -20,7 +20,7 @@ function parseDate($datetime) {
 //Checks the results table if the checksum is already in there. Returns true for a double, false for no double.
 function checkDoubles($conn, $checksum) {
   //Get field checksum from table events if the provided checksum matches
-  $stmt = "SELECT checksum FROM events WHERE checksum=\"$checksum\"";
+  $stmt = "SELECT checksum FROM race_events WHERE checksum=\"$checksum\"";
   $result = $conn->query($stmt);
   $result = $result->fetch_assoc();
   //If we get a result, we obviously have a double and return true.
@@ -29,6 +29,18 @@ function checkDoubles($conn, $checksum) {
   }
   //If otherwise we had no match and no double. So we return false.
   return false;
+}
+
+//Checks if start position is zero, the it's a practice or quali session. Returns true if it's a race session, false otherwise.
+function isRace($data) {
+  foreach ($data as $key => $value) {
+    $row = str_getcsv($value);
+    if($row[8] == 0) {
+      return false;
+    } else {
+      return true;
+    }
+  }
 }
 
 //Checks the drivers table if driver is already in the database
@@ -90,7 +102,7 @@ function getCarID($conn, $iracing_car_id) {
   return $row['id'];
 }
 
-//Get inter ID of driver
+//Get intern ID of driver
 function getDriverID($conn, $iracing_id) {
   $sql = "SELECT * FROM drivers WHERE iracing_id=?";
   $stmt = mysqli_stmt_init($conn);
@@ -107,9 +119,10 @@ function getDriverID($conn, $iracing_id) {
   return $row['id'];
 }
 
-
+//Get the .csv file from the POST
 $input = file($_FILES['inputcsv']['tmp_name']);
-//Create Checksum to verify doubles;
+
+//Create Checksum to verify doubles, if a double is detected, send back to the previous page with error Info
 $checksum = "'".sha1_file($_FILES['inputcsv']['tmp_name'])."'";
 if(checkDoubles($conn, $checksum)) {
   header("Location: ../entercsv.php?error=double");
@@ -130,15 +143,21 @@ $leagueInfo = str_getcsv(array_shift($input));
 array_shift($input);
 array_shift($input);
 
-$stmt_event = $conn->prepare("INSERT INTO events (checksum, time_and_day, league_id, season_id) VALUES (?, ?, ?, ?)");
-$stmt_event->bind_param("ssii", $checksum, $datetime, $leagueid, $seasonid);
+//Check if the entered event is a race, if not -> send back
+if (!isRace($input)) {
+  header("Location: ../entercsv.php?error=notrace");
+  exit();
+}
 
+//Prepare data to enter into race_events mysql_list_tables
+//TODO Handling of $trackid
 $datetime = parseDate($eventInfo[0]);
 $leagueid = $leagueInfo[1];
 $seasonid = $leagueInfo[3];
 $trackid = 1;
 
-$sql = "INSERT INTO events (checksum, time_and_day, track_id, league_id, season_id) VALUES (?, ?, ?, ?, ?)";
+//Prepare SQL and execute
+$sql = "INSERT INTO race_events (checksum, time_and_day, track_id, league_id, season_id) VALUES (?, ?, ?, ?, ?)";
 $stmt = mysqli_stmt_init($conn);
 if(!mysqli_stmt_prepare($stmt, $sql)) {
   header("Location: ../entercsv.php?error=sqlerror");
@@ -149,6 +168,7 @@ mysqli_stmt_execute($stmt);
 $eventid = mysqli_stmt_insert_id($stmt);
 mysqli_stmt_close($stmt);
 
+//Prepare and enter data into the race_results database
 foreach ($input as $key => $value) {
   $line = str_getcsv($value);
   if(!checkDriverExists($conn, $line[6])) {
@@ -183,4 +203,5 @@ foreach ($input as $key => $value) {
 
 }
 
+//Send back with success flag and event ID
 header("Location: ../entercsv.php?success=event&eventid=".$eventid);
